@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Available WiFi Networks</title>
+    <script>
+        let selectedNetwork = '';
+
+        function getSignalStrength(signalPercentage) {
+                if (signalPercentage >= 90) {
+                    return 4;
+                } else if (signalPercentage >= 60) {
+                    return 3;
+                } else if (signalPercentage >= 25) {
+                    return 2;
+                } else if (signalPercentage > 10) {
+                    return 1;
+                }
+                return 0;
+            }
+
+        // Initialize signal strength indicators
+        document.addEventListener('DOMContentLoaded', function() {
+            document.querySelectorAll('.wifi-signal').forEach(function(element) {
+                const signal = parseInt(element.dataset.signal);
+                const strength = getSignalStrength(signal);
+                element.classList='wifi-signal strength-' + strength;
+            });
+        });
+
+        function testNetwork() {
+            const password = document.getElementById('wifi-password').value;
+            // Add your network connection logic here
+            console.log(`Connecting to network: ${selectedNetwork} with password: ${password}`);
+
+            // Show loading indicator
+            const statusDiv = document.getElementById('status-message');
+            statusDiv.style.color = '';
+            statusDiv.textContent = 'Testing connection...';
+            
+            const testBtn = document.getElementById('testBtn');
+            testBtn.disabled = true;
+            testBtn.style.backgroundColor = '#cccccc';
+
+            // Example AJAX call to your backend
+            fetch('/test_network', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    ssid: selectedNetwork,
+                    password: password
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.result === 'OK') {
+                    statusDiv.textContent = 'Connection successful!';
+                    statusDiv.style.color = 'green';
+                    document.getElementById('ip-address').textContent = `IP: ${data.ip_address}`;
+                    document.getElementById('gateway-address').textContent = `Gateway: ${data.gateway}`;
+                    document.getElementById('dhcp-address').textContent =  `DHCP: ${data.dhcp_server}`;
+                } else {
+                    statusDiv.textContent = `Connection failed: ${data.error || 'Unknown error'}`;
+                    statusDiv.style.color = 'red';
+                }
+            })
+            .catch(error => {
+                statusDiv.textContent = `Error: ${error.message}`;
+                statusDiv.style.color = 'red';
+            })
+            .finally(()=> {
+                testBtn.disabled = false;
+                testBtn.style.backgroundColor = '';
+            });
+        }
+        
+        function closePopup() {
+            document.getElementById('password-popup').style.display = 'none';
+            document.getElementById('main-content').classList.remove('blur');
+            document.getElementById('status-message').textContent = '';
+            document.getElementById('ip-address').textContent = '';
+            document.getElementById('gateway-address').textContent = '';
+            document.getElementById('dhcp-address').textContent =  '';
+            selectedNetwork = '';
+        }
+
+        function switchAP() {
+            fetch('/switch_ap', {
+                method: 'POST'
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.success) {
+                    // Refresh the page after successful switch
+                    setTimeout(() => {
+                        location.reload();
+                    }, 2000);
+                } else {
+                    alert('Failed to switch network');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Failed to switch network. Please try again.');
+            });
+        }
+
+        function disableAP() {
+            fetch('/disable_ap', {
+                method: 'POST'
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.success) {
+                    // Refresh the page after successful switch
+                    setTimeout(() => {
+                        location.reload();
+                    }, 2000);
+                } else {
+                    alert('Failed to switch network');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Failed to switch network. Please try again.');
+            });
+        }
+
+
+
+
+        document.addEventListener('DOMContentLoaded', function() {
+            function showPasswordPrompt(networkName, requiresPassword) {
+                selectedNetwork = networkName.trim();
+                if (!requiresPassword) {
+                    // Test directly if no password required
+                    testNetwork();
+                    return;
+                }
+                document.getElementById('selected-network-name').textContent = networkName;
+                document.getElementById('password-popup').style.display = 'flex';
+                document.getElementById('main-content').classList.add('blur');
+                document.getElementById('wifi-password').value = '';
+                document.getElementById('wifi-password').focus();
+            }
+
+
+            // Add click event listeners to network elements
+            const networks = document.querySelectorAll('.wifi-network');
+            networks.forEach(network => {
+                if (!network.classList.contains('connected-network') && !network.classList.contains('unreachable-network') ) {
+                    network.addEventListener('click', function() {
+                        const ssid = this.querySelector('.ssid').textContent;
+                        const requiresPassword = true; // You should determine this based on network security
+                        showPasswordPrompt(ssid, requiresPassword);
+                    });
+                }
+            });
+
+            // Close popup when clicking outside
+            const popup = document.getElementById('password-popup');
+            if (popup) {
+                popup.addEventListener('click', function(e) {
+                    if (e.target === this) {
+                        closePopup();
+                    }
+                });
+            }
+
+            // Handle Enter key in password input
+            const passwordInput = document.getElementById('wifi-password');
+            if (passwordInput) {
+                passwordInput.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') {
+                        testNetwork();
+                    }
+                });
+            }
+
+        });
+    </script>
+    <style>
+        :root {
+            --color-bg: #ffffff;
+            --color-border: #d0d7de;
+            --color-header: #24292f;
+            --color-text: #1F2328;
+            --color-secondary: #656d76;
+            --color-button: #1f883d;
+            --color-button-hover: #1a7f37;
+            --color-connected: #dafbe1;
+            --color-connected-border: #4ac26b;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif;
+            line-height: 1.5;
+            color: var(--color-text);
+            background-color: #f6f8fa;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            font-size: 24px;
+            font-weight: 600;
+            color: var(--color-header);
+            margin-bottom: 16px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--color-border);
+        }
+
+        .wifi-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .wifi-network {
+            background-color: var(--color-bg);
+            border: 1px solid var(--color-border);
+            border-radius: 6px;
+            margin-bottom: 8px;
+            padding: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .wifi-network:hover {
+            background-color: #f6f8fa;
+        }
+
+        .network-main {
+            flex: 2;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .ssid-info {
+            min-width: 200px;
+        }
+
+        .ssid {
+            font-weight: 600;
+            font-size: 14px;
+            color: var(--color-header);
+            margin-bottom: 2px;
+        }
+
+        .bssid {
+            font-size: 12px;
+            color: var(--color-secondary);
+        }
+
+        .network-details {
+            flex: 3;
+            display: flex;
+            gap: 24px;
+            font-size: 13px;
+        }
+
+        .detail-group {
+            display: flex;
+            gap: 24px;
+        }
+
+        .detail-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .label {
+            color: var(--color-secondary);
+            font-weight: 500;
+        }
+
+        .value {
+            color: var(--color-text);
+        }
+
+        .signal-info {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            min-width: 100px;
+        }
+
+        .wifi-signal {
+        display: inline-block;
+        width: 16px;
+        height: 16px;
+        position: relative;
+        }
+
+        .wifi-signal .bar {
+            width: 3px;
+            position: absolute;
+            bottom: 0;
+            background-color: #888; /* Default color for inactive bars */
+        }
+
+        .wifi-signal .bar-1 { height: 4px;  left: 0px; }
+        .wifi-signal .bar-2 { height: 7px;  left: 4px; }
+        .wifi-signal .bar-3 { height: 10px; left: 8px; }
+        .wifi-signal .bar-4 { height: 13px; left: 12px; }
+
+        /* Active bar color */
+        .wifi-signal.strength-1 .bar-1,
+        .wifi-signal.strength-2 .bar-1,
+        .wifi-signal.strength-2 .bar-2,
+        .wifi-signal.strength-3 .bar-1,
+        .wifi-signal.strength-3 .bar-2,
+        .wifi-signal.strength-3 .bar-3,
+        .wifi-signal.strength-4 .bar-1,
+        .wifi-signal.strength-4 .bar-2,
+        .wifi-signal.strength-4 .bar-3,
+        .wifi-signal.strength-4 .bar-4 {
+            background-color: #2196F3; /* Or any color you prefer */
+        }
+
+
+        .status {
+            display: inline-block;
+            padding: 2px 8px;
+            font-size: 12px;
+            font-weight: 600;
+            line-height: 18px;
+            border-radius: 2em;
+            background-color: #1f883d;
+            color: #ffffff;
+        }
+
+        .refresh-button {
+            display: inline-block;
+            padding: 5px 16px;
+            font-size: 14px;
+            font-weight: 600;
+            line-height: 20px;
+            cursor: pointer;
+            border: 1px solid rgba(27, 31, 36, 0.15);
+            border-radius: 6px;
+            background-color: var(--color-button);
+            color: #ffffff;
+            transition: .2s cubic-bezier(0.3, 0, 0.5, 1);
+        }
+
+        .refresh-button:hover {
+            background-color: var(--color-button-hover);
+        }
+
+        .no-networks {
+            background-color: var(--color-bg);
+            border: 1px solid var(--color-border);
+            border-radius: 6px;
+            padding: 16px;
+            color: var(--color-secondary);
+            text-align: center;
+        }
+
+        .connected-network {
+            background-color: var(--color-connected);
+            border-color: var(--color-connected-border);
+            margin-bottom: 24px !important;
+        }
+
+        .ip-address {
+            font-weight: 600;
+            font-size: 12px;
+            color: var(--color-secondary);
+            margin-top: 2px;
+
+        }
+
+        .network-separator {
+            height: 1px;
+            background-color: var(--color-border);
+            margin: 16px 0;
+            list-style: none;
+        }
+
+        .known-network-icon {
+            width: 16px;
+            height: 16px;
+            display: inline-block;
+            margin-left: 8px;
+            vertical-align: middle;
+        }
+
+        .known-network-icon::before {
+            content: "★";
+            color: #2196F3;
+            font-size: 14px;
+        }
+
+        .known-networks-section {
+            margin-top: 24px;
+            padding-top: 24px;
+            border-top: 1px solid var(--color-border);
+        }
+
+        .known-networks-section h2 {
+            font-size: 1.2em;
+            margin-bottom: 16px;
+            color: var(--color-header);
+        }
+
+        .unreachable-network {
+            opacity: 0.7;
+        }
+
+        .unreachable-network .status {
+            color: #666;
+            font-size: 12px;
+            font-style: italic;
+        }
+
+
+
+        @media screen and (max-width: 768px) {
+        .container {
+            padding: 10px;
+        }
+
+        .wifi-network {
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .network-main {
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .network-details {
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .detail-group {
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .ssid-info {
+            min-width: unset;
+        }
+
+        .signal-info {
+            justify-content: flex-start;
+            min-width: unset;
+        }
+
+        h1 {
+            font-size: 20px;
+            margin-bottom: 12px;
+            padding-bottom: 12px;
+        }
+
+        .wifi-list {
+            margin: 0 -10px;
+        }
+
+        .detail-item {
+            justify-content: flex-start;
+        }
+
+        .status {
+            align-self: flex-start;
+        }
+    }
+
+
+    @media screen and (max-width: 480px) {
+        body {
+            padding: 10px;
+        }
+
+        .wifi-network {
+            padding: 10px;
+        }
+
+        .ssid {
+            font-size: 13px;
+        }
+
+        .bssid {
+            font-size: 11px;
+        }
+
+        .ip-address {
+            font-size: 11px;
+        }
+
+        .detail-item {
+            font-size: 12px;
+        }
+
+        .status {
+            font-size: 11px;
+            padding: 2px 6px;
+        }
+    }
+
+    .popup {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.5);
+        z-index: 1000;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .popup-content {
+        background-color: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        width: 90%;
+        max-width: 400px;
+    }
+
+    .popup-content h2 {
+        margin: 0 0 15px 0;
+        color: #333;
+    }
+
+    .popup-content input {
+        width: 100%;
+        padding: 8px;
+        margin: 10px 0;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        box-sizing: border-box;
+    }
+
+    .popup-buttons {
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+        margin-top: 15px;
+    }
+
+    .popup-buttons button {
+        padding: 8px 16px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+    }
+
+    .popup-buttons button:first-child {
+        background-color: #4CAF50;
+        color: white;
+    }
+
+    .popup-buttons button:last-child {
+        background-color: #f0f0f0;
+    }
+
+    /* Blur effect class */
+    .blur {
+        filter: blur(5px);
+        transition: filter 0.3s ease;
+    }
+
+    #selected-network-name {
+        color: #666;
+        margin: 5px 0;
+    }
+
+    /* Responsive adjustments */
+    @media screen and (max-width: 768px) {
+        .popup-content {
+            width: 85%;
+            padding: 15px;
+        }
+    }
+    </style>
+</head>
+<body>
+    <div id="main-content">
+        <div class="container">
+            <h1>Available WiFi Networks</h1>
+            
+            {% if networks %}
+                <ul class="wifi-list">
+                {% for network in networks %}
+                    {% if network.in_use %}
+                    <li class="wifi-network connected-network">
+                        <div class="network-main">
+                            <div class="ssid-info">
+                                <div class="ssid">{{ network.ssid }}</div>
+                                <div class="bssid">{{ network.bssid }}</div>
+                                <div class="ip-address">{{ ip_address }}</div>
+                            </div>
+                            <div class="network-details">
+                                <div class="detail-group">
+                                    <div class="detail-item">
+                                        <span class="label">Mode:</span>
+                                        <span class="value">{{ network.mode }}</span>
+                                    </div>
+                                    <div class="detail-item">
+                                        <span class="label">Ch:</span>
+                                        <span class="value">{{ network.chan }}</span>
+                                    </div>
+                                </div>
+                                <div class="detail-group">
+                                    <div class="detail-item">
+                                        <span class="label">Rate:</span>
+                                        <span class="value">{{ network.rate }} {{ network.rate_unit }}</span>
+                                    </div>
+                                    <div class="detail-item">
+                                        <span class="label">Security:</span>
+                                        <span class="value">{{ network.security }}</span>
+                                    </div>
+                                    <div class="status">Connected</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="signal-info">
+                            <div class="wifi-signal" data-signal="{{ network.signal }}">
+                                <div class="bar bar-1"></div>
+                                <div class="bar bar-2"></div>
+                                <div class="bar bar-3"></div>
+                                <div class="bar bar-4"></div>
+                            </div>
+                            <div class="detail-item">
+                                <span class="value">{{ network.signal }}%</span>
+                            </div>
+                        </div>
+                    </li>
+                    {% endif %}
+                {% endfor %}
+                <li class="network-separator"></li>
+
+                {% for network in networks %}
+                    {% if not network.in_use %}
+                    <li class="wifi-network">
+                        <div class="network-main">
+                            <div class="ssid-info">
+                                <div class="ssid">{{ network.ssid }}</div>
+                                <div class="bssid">{{ network.bssid }}</div>
+                            </div>
+                            <div class="network-details">
+                                <div class="detail-group">
+                                    <div class="detail-item">
+                                        <span class="label">Mode:</span>
+                                        <span class="value">{{ network.mode }}</span>
+                                    </div>
+                                    <div class="detail-item">
+                                        <span class="label">Ch:</span>
+                                        <span class="value">{{ network.chan }}</span>
+                                    </div>
+                                </div>
+                                <div class="detail-group">
+                                    <div class="detail-item">
+                                        <span class="label">Rate:</span>
+                                        <span class="value">{{ network.rate }} {{ network.rate_unit }}</span>
+                                    </div>
+                                    <div class="detail-item">
+                                        <span class="label">Security:</span>
+                                        <span class="value">{{ network.security }}</span>
+                                    </div>
+                                    {% if network.known %}
+                                    <div class="status" title="Known network">Saved</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="signal-info">
+                            <div class="wifi-signal" data-signal="{{ network.signal }}">
+                                <div class="bar bar-1"></div>
+                                <div class="bar bar-2"></div>
+                                <div class="bar bar-3"></div>
+                                <div class="bar bar-4"></div>
+                            </div>
+                            <div class="detail-item">
+                                <span class="value">{{ network.signal }}%</span>
+                            </div>
+                        </div>
+                    </li>
+                    {% endif %}
+                {% endfor %}
+                {% if unreacheable_known %}
+                    <div class="known-networks-section">
+                        <h2>Saved Networks (Not in Range)</h2>
+                        <ul class="wifi-list unreachable-networks">
+                            {% for network_name in unreacheable_known %}
+                            <li class="wifi-network unreachable-network">
+                                <div class="network-main">
+                                    <div class="ssid-info">
+                                        <div class="ssid">{{ network_name }}</div>
+                                    </div>
+                                </div>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                {% endif %}
+
+                </ul>
+            {% else %}
+                <div class="no-networks">
+                    <p>No WiFi networks found.</p>
+                </div>
+            {% endif %}
+            <button class="refresh-button" onclick="location.reload()">
+                ↻ Refresh Networks
+            </button>
+
+            {% if actual_state < 2 %}
+                <button class="refresh-button" onclick="switchAP()">Switch to AP ({{actual_state}})</button>
+            {% endif %}
+
+            {% if actual_state == 2 %}
+                <button class="refresh-button" onclick="disableAP()">Disable AP ({{actual_state}})</button>
+            {% endif %}
+        </div>
+    </div>
+
+    <div id="password-popup" class="popup">
+        <div class="popup-content">
+            <h2>Enter WiFi Password</h2>
+            <p id="selected-network-name"></p>
+            <input type="password" id="wifi-password" placeholder="Enter password">
+            <div class="popup-buttons">
+                <button onclick="testNetwork()" id="testBtn">Test</button>
+                <button onclick="closePopup()">Cancel</button>
+            </div>
+            <div id="status-message"></div>
+            <div id="ip-address"></div>
+            <div> 
+                <span id="gateway-address"></span>
+                <span id="dhcp-address"></span>
+            </div>
+        </div>
+    </div>
+
+</body>
+</html>
+ 

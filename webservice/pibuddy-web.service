@@ -1,0 +1,33 @@
+[Unit]
+Description=PiBuddy Web service
+After=network.target
+
+[Service]
+Type=simple
+User=orangepi
+Group=orangepi
+# Use the full path to your conda environment
+Environment="PATH=/opt/pibuddy/pyenv/pibuddy/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+# Add conda-specific environment variables
+Environment=CONDA_HOME=/opt/miniconda3
+Environment=CONDA_ENVS_PATH=/opt/miniconda3/envs
+Environment=CONDA_ROOT_PREFIX=/opt/miniconda3
+Environment=CONDA_NO_PLUGINS=true
+Environment=PYTHONPATH=/opt/pibuddy/pyenv/pibuddy/lib/python3.12/site-packages
+
+# Activate conda environment before starting
+ExecStart=/bin/bash -c 'source /opt/miniconda3/etc/profile.d/conda.sh && conda activate /opt/pibuddy/pyenv/pibuddy && python -m webservice.hello_service'
+WorkingDirectory=/opt/pibuddy
+Restart=always
+# Restrict service privileges
+ProtectSystem=full
+# As conda requires to read some config files under the user folder, so must deactivate ProtectHome
+ProtectHome=false
+# Sudo command is necessary so NoNewPrivileges should be set to false
+NoNewPrivileges=false
+# Limit resources
+MemoryMax=128M
+CPUQuota=20%
+
+[Install]
+WantedBy=multi-user.target
