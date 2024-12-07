@@ -36,22 +36,20 @@ def shutdown_server():
 def hello_world():
     # Get the IP address of the machine
     ip_address = get_ip_address()
-    # Get the list of available Wi-Fi networks
-    wl = list(netinfo.get_wifi_list(setting.SUDO_PSW))
-    kwn = netinfo.get_known_networks(setting.SUDO_PSW)
-    unreacheable_known = [k for k in kwn if k not in [w.ssid for w in wl]]
-    reacheable_known = [w for w in wl if w.known]
-    # actual_state values 
-    # WIFI_MODE_UNKNOWN=-1
-    # WIFI_MODE_UNCONNECT=0
-    # WIFI_MODE_INFRA=1
-    # WIFI_MODE_AP=2
+
     actual_state = netinfo.get_wifi_mode(wifi_manager.AP_SSID, setting.SUDO_PSW)
-    
+    kwn = netinfo.get_known_networks(setting.SUDO_PSW)
+
+
+    # Get the list of available Wi-Fi networks
+    wl = list((w for w in netinfo.get_wifi_list(setting.SUDO_PSW) if w.ssid))
+
+    unreacheable_known = [k for k in kwn if k.ssid not in [w.ssid for w in wl]]
+
     # Return the HTML response
     return render_template('wifi_networks.html', networks=wl, ip_address=ip_address, 
                            unreacheable_known = unreacheable_known, 
-                           actual_state = actual_state, reacheable_known_count=len(reacheable_known))
+                           actual_state = actual_state)
 
 @app.route('/switch_ap', methods=['POST', 'GET'])
 def switch_ap():
@@ -89,6 +87,66 @@ def disable_ap():
         return jsonify({
             'result': 'ERROR',
             'error': result.stderr or 'No output from test script'
+        }), 500
+
+@app.route('/create_network', methods=['POST'])
+def create_network():
+    try:
+        # Get credentials from the request
+        data = request.get_json()
+
+        # Validate required fields
+        if not data or 'ssid' not in data or 'password' not in data:
+            return jsonify({
+                'result': 'ERROR',
+                'error': 'SSID and password are required in JSON body'
+            }), 400
+        
+        ssid = data['ssid'].strip()
+        password = data['password'].strip()
+
+        wifi_manager.create_network(ssid, password, setting.SUDO_PSW)
+        return jsonify({
+            'result': 'OK',
+            'ssid': ssid
+        })
+    except Exception as e:
+        return jsonify({
+            'result': 'ERROR',
+            'error': str(e)
+        }), 500
+    
+
+@app.route('/toggle_autoconnect', methods=['POST'])
+def toggle_autoconnect():
+    try:
+        # Get credentials from the request
+        data = request.get_json()
+
+        # Validate required fields
+        if not data or 'ssid' not in data or 'enabled' not in data:
+            return jsonify({
+                'result': 'ERROR',
+                'error': 'SSID and enabled are required in JSON body'
+            }), 400
+        
+        ssid = data['ssid'].strip()
+        enabled = data['enabled']
+        assert type(enabled) == bool, 'Invalid enabled value'
+
+        if enabled:
+            wifi_manager.enable_autoconnect(ssid, setting.SUDO_PSW)
+        else:
+            wifi_manager.disable_autoconnect(ssid, setting.SUDO_PSW)
+
+        return jsonify({
+            'result': 'OK',
+            'ssid': ssid
+        })
+    except Exception as e:
+        return jsonify({
+            'result': 'ERROR',
+            'error': str(e)
         }), 500
 
 @app.route('/test_network', methods=['POST'])
@@ -150,6 +208,58 @@ def test_network():
 def shutdown():
     shutdown_server()
     return 'Server shutting down...'
+
+@app.route('/delete_network', methods=['POST'])
+def delete_network():
+    data = request.get_json()
+    ssid = data.get('ssid')
+    if not ssid:
+        return jsonify({'error': 'SSID is required'}), 400
+    
+    try:
+        wifi_manager.delete_connection(ssid, setting.SUDO_PSW)
+        return jsonify({'message': 'Network deleted successfully'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/connect_network', methods=['POST'])
+def connect_network():
+    try:
+        data = request.get_json()
+        if not data or 'ssid' not in data:
+            return jsonify({
+                'result': 'ERROR',
+                'error': 'SSID is required in JSON body'
+            }), 400
+        
+        ssid = data['ssid'].strip()
+        
+        # Get current connection before attempting to change
+        current_connection = wifi_manager.get_current_connection(setting.SUDO_PSW)
+        
+        try:
+            # Attempt to reconnect to the specified network
+            if wifi_manager.reconnect_to(ssid, setting.SUDO_PSW):
+                return jsonify({
+                    'result': 'OK',
+                    'ssid': ssid
+                })
+            else:
+                raise RuntimeError("Failed to connect to network")
+        except Exception as e:
+            # If connection fails, attempt to fall back to original network
+            if current_connection:
+                wifi_manager.cleanup(current_connection, setting.SUDO_PSW)
+            return jsonify({
+                'result': 'ERROR',
+                'error': str(e)
+            }), 500
+            
+    except Exception as e:
+        return jsonify({
+            'result': 'ERROR',
+            'error': str(e)
+        }), 500
 
 if __name__ == '__main__':
     # Run the app on all network interfaces

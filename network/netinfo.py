@@ -4,6 +4,19 @@ import subprocess
 from .utils import logger, run_sudo_command
 
 @dataclass
+class KnownNetwrok:
+    ssid: str
+    activated: bool
+    autoconnect: bool
+
+    def __init__(self, line:str):
+        line = line.replace('\\:', '-')
+        line_parts = line.split(":")
+        self.ssid = line_parts[0].strip()
+        self.activated = line_parts[1].lower().strip() == 'activated'
+        self.autoconnect = line_parts[2].lower().strip() == 'yes'
+
+@dataclass
 class WIFINetwrok:
     in_use: bool
     bssid: str
@@ -15,11 +28,12 @@ class WIFINetwrok:
     bars: str
     security: str
     known: bool = False
+    autoconnect: bool = False
 
     def __init__(self, line:str):
         line = line.replace('\\:', '-')
         line_parts = line.split(":")
-        
+
         if line_parts[0] == '*':
             self.in_use = True
         else:
@@ -32,6 +46,9 @@ class WIFINetwrok:
         self.signal = int(self.signal)
         self.security = ' '.join(line_parts[8:])
 
+
+
+
 WIFI_MODE_UNKNOWN=-1
 WIFI_MODE_UNCONNECT=0
 WIFI_MODE_INFRA=1
@@ -39,7 +56,7 @@ WIFI_MODE_AP=2
 
 
 def get_current_connection(sudo_password:str)->str: 
-    """Get current WiFi connection details."""
+    """Get current WiFi connection SSID."""
     try:
         stdout, stderr = run_sudo_command( ['nmcli', '-t', '-f', 'active,ssid', 'dev', 'wifi'], sudo_password)
         for l in stdout.strip().split('\n'):
@@ -145,19 +162,26 @@ def get_network_info():
         logger.error(f"Error getting network information: {e}")
         raise
 
-def get_known_networks(sudo_password:str) -> list:
-    stdout, stderr = run_sudo_command(['nmcli', 'connection', 'show'], sudo_password)
+def get_known_networks(sudo_password:str) -> list[KnownNetwrok]:
+    stdout, stderr = run_sudo_command(['nmcli', '-t', '-f', 'name,state,autoconnect,type', 'con', 'show'], sudo_password)
     if stderr:
         logger.error(f"Failed to get known networks: {stderr}")
         return []
     else:
         networks = []
         for line in stdout.split('\n'):
-            if 'wifi' in line:
-                networks.append(line.split()[0])
+            if '802-11-wireless' in line:
+                networks.append(KnownNetwrok(line))
         return networks
 
+def find_from_known_network(known_networks:list[KnownNetwrok], ssid:str) -> KnownNetwrok:
+    for network in known_networks:
+        if network.ssid == ssid:
+            return network
+    return None
+
 def get_wifi_list(sudo_password:str):
+    run_sudo_command(['nmcli', 'dev', 'wifi', 'rescan'], sudo_password)
     known_networks = get_known_networks(sudo_password) 
     stdout, stderr = run_sudo_command(['nmcli', '-t', 'dev', 'wifi', 'list'], sudo_password)
     if stderr:
@@ -167,7 +191,13 @@ def get_wifi_list(sudo_password:str):
     for line in stdout.splitlines()[1:]:
         try:
             wn = WIFINetwrok(line)
-            wn.known = wn.ssid in known_networks
+            kn = find_from_known_network(known_networks, wn.ssid)
+            if kn:
+                wn.autoconnect = kn.autoconnect
+                wn.known = True
+            else:
+                wn.autoconnect = False
+                wn.known = False
             yield wn
         except Exception as e:
             logger.error(f"Error: {e}")

@@ -5,7 +5,108 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Available WiFi Networks</title>
     <script>
+        let networkToDelete = '';
+        let networkToConnect = '';
         let selectedNetwork = '';
+
+        function deleteNetwork(ssid) {
+            networkToDelete = ssid;
+            document.getElementById('delete-network-name').textContent = ssid;
+            document.getElementById('delete-network-popup').style.display = 'flex';
+            document.getElementById('main-content').classList.add('blur');
+        }
+
+        function toggleAutoconnect(event, ssid) {
+            event.stopPropagation();
+            const enabled = event.target.checked;
+            
+            fetch('/toggle_autoconnect', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    ssid: ssid,
+                    enabled: enabled
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    alert('Error: ' + data.error);
+                    event.target.checked = !enabled;  // Revert checkbox state
+                }else{
+                    alert("Success : Set " + ssid + " autoconnect to " + enabled);
+                    location.reload();
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Failed to update autoconnect setting');
+                event.target.checked = !enabled;  // Revert checkbox state
+            });
+        }
+
+        function connectNetwork(ssid) {
+            networkToConnect = ssid;
+            document.getElementById('connect-network-name').textContent = ssid;
+            document.getElementById('connect-network-popup').style.display = 'flex';
+            document.getElementById('main-content').classList.add('blur');
+        }
+
+        async function confirmConnect() {
+            let statusDiv = document.getElementById('cnx-status-message');
+            let connectBtn = document.getElementById('connectBtn');
+            connectBtn.disabled = true;
+            statusDiv.textContent = "Connecting... it would take some time. DO NOT refresh or close this page!"
+            statusDiv.style.color = '';
+            try {
+                const response = await fetch('/connect_network', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ ssid: networkToConnect })
+                });
+                const data = await response.json();
+                if (data.result === 'OK') {
+                    location.reload();
+                } else {
+                    connectNetwork(networkToConnect);
+                    statusDiv.textContent = data.error;
+                    statusDiv.style.color = 'red';
+                    connectBtn.disabled = false;
+                }
+            } catch (error) {
+                connectNetwork(networkToConnect);
+                statusDiv.textContent = 'error';
+                statusDiv.style.color = 'red';
+                connectBtn.disabled = false;
+            }
+        }
+
+        async function confirmDelete() {
+            try {
+                const response = await fetch('/delete_network', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ ssid: networkToDelete })
+                });
+                
+                if (response.ok) {
+                    location.reload();
+                } else {
+                    console.error('Failed to delete network');
+                    alert('Failed to delete network');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Error deleting network: ' + error);
+            }
+            closePopup();
+        }
 
         function getSignalStrength(signalPercentage) {
                 if (signalPercentage >= 90) {
@@ -19,15 +120,6 @@
                 }
                 return 0;
             }
-
-        // Initialize signal strength indicators
-        document.addEventListener('DOMContentLoaded', function() {
-            document.querySelectorAll('.wifi-signal').forEach(function(element) {
-                const signal = parseInt(element.dataset.signal);
-                const strength = getSignalStrength(signal);
-                element.classList='wifi-signal strength-' + strength;
-            });
-        });
 
         function testNetwork() {
             const password = document.getElementById('wifi-password').value;
@@ -76,16 +168,88 @@
                 testBtn.style.backgroundColor = '';
             });
         }
+
+        function createNetwork(){
+            const ssid = document.getElementById('cn-wifi-ssid').value;
+            const password = document.getElementById('cn-wifi-password').value;
+            // Add your network connection logic here
+            console.log(`Connecting to network: ${ssid} with password: ${password}`);
+
+            // Show loading indicator
+            const statusDiv = document.getElementById('cn-status-message');
+            statusDiv.style.color = '';
+            statusDiv.textContent = 'Creating network...';
+            
+            const createBtn = document.getElementById('cn_createBtn');
+            createBtn.disabled = true;
+            createBtn.style.backgroundColor = '#cccccc';
+
+            // Example AJAX call to your backend
+            fetch('/create_network', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    ssid: ssid,
+                    password: password
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.result === 'OK') {
+                    statusDiv.textContent = 'Create network successful!';
+                    statusDiv.style.color = 'green';
+                    alert("Create network successful!");
+                    closePopup();
+                } else {
+                    statusDiv.textContent = `Create network failed: ${data.error || 'Unknown error'}`;
+                    statusDiv.style.color = 'red';
+                    createBtn.disabled = false;
+                    createBtn.style.backgroundColor = '';
+                }
+            })
+            .catch(error => {
+                statusDiv.textContent = `Error: ${error.message}`;
+                statusDiv.style.color = 'red';
+                createBtn.disabled = false;
+                createBtn.style.backgroundColor = '';
+            })
+            .finally(()=> {
+                ;
+            });
+        }
         
-        function closePopup() {
+        function resetPasswordPopup(){
+            // reset password popup
+            document.getElementById('wifi-password').value = '';
             document.getElementById('password-popup').style.display = 'none';
-            document.getElementById('main-content').classList.remove('blur');
             document.getElementById('status-message').textContent = '';
             document.getElementById('ip-address').textContent = '';
             document.getElementById('gateway-address').textContent = '';
             document.getElementById('dhcp-address').textContent =  '';
             selectedNetwork = '';
         }
+
+        function resetCreateConnectionPopup(){
+            document.getElementById('create-network-popup').style.display = 'none';
+            document.getElementById('cn-wifi-ssid').value = '';
+            document.getElementById('cn-wifi-password').value = '';
+            document.getElementById('cn-status-message').textContent = '';
+        }
+
+        function closePopup() {
+            document.getElementById('main-content').classList.remove('blur');
+            resetPasswordPopup();
+            resetCreateConnectionPopup();
+            document.getElementById('delete-network-popup').style.display = 'none';
+            document.getElementById('connect-network-popup').style.display = 'none';
+            document.getElementById('create-network-popup').style.display = 'none';
+
+            document.getElementById('cnx-status-message').textContent = '';
+            document.getElementById('cnx-status-message').style.color = '';
+        }
+
 
         function switchAP() {
             fetch('/switch_ap', {
@@ -139,46 +303,64 @@
             });
         }
 
+        function showCreateConnectionPrompt() {
+            resetCreateConnectionPopup();
+            document.getElementById('create-network-popup').style.display = 'flex';
+            document.getElementById('main-content').classList.add('blur');
+            document.getElementById('cn-wifi-ssid').focus();
+        }
 
-
-
-        document.addEventListener('DOMContentLoaded', function() {
-            function showPasswordPrompt(networkName, requiresPassword) {
-                selectedNetwork = networkName.trim();
-                if (!requiresPassword) {
-                    // Test directly if no password required
-                    testNetwork();
-                    return;
-                }
-                document.getElementById('selected-network-name').textContent = networkName;
-                document.getElementById('password-popup').style.display = 'flex';
-                document.getElementById('main-content').classList.add('blur');
-                document.getElementById('wifi-password').value = '';
-                document.getElementById('wifi-password').focus();
+        function showPasswordPrompt(networkName, requiresPassword) {
+            selectedNetwork = networkName.trim();
+            if (!requiresPassword) {
+                // Test directly if no password required
+                testNetwork();
+                return;
             }
+            document.getElementById('selected-network-name').textContent = networkName;
+            document.getElementById('password-popup').style.display = 'flex';
+            document.getElementById('main-content').classList.add('blur');
+            document.getElementById('wifi-password').value = '';
+            document.getElementById('wifi-password').focus();
+        }
 
-
-            // Add click event listeners to network elements
-            const networks = document.querySelectorAll('.wifi-network');
-            networks.forEach(network => {
-                if (!network.classList.contains('connected-network') && !network.classList.contains('unreachable-network') ) {
-                    network.addEventListener('click', function() {
-                        const ssid = this.querySelector('.ssid').textContent;
-                        const requiresPassword = true; // You should determine this based on network security
-                        showPasswordPrompt(ssid, requiresPassword);
-                    });
-                }
-            });
-
+        function clickOutSideOfPopup(popup_name)
+        {
             // Close popup when clicking outside
-            const popup = document.getElementById('password-popup');
-            if (popup) {
-                popup.addEventListener('click', function(e) {
+            const psw_popup = document.getElementById(popup_name);
+            if (psw_popup) {
+                psw_popup.addEventListener('click', function(e) {
                     if (e.target === this) {
                         closePopup();
                     }
                 });
             }
+        }
+
+
+        document.addEventListener('DOMContentLoaded', function() {
+            // Add click event listeners to network elements
+            // const networks = document.querySelectorAll('.wifi-network');
+            // networks.forEach(network => {
+            //     if (!network.classList.contains('connected-network') && !network.classList.contains('unreachable-network') ) {
+            //         network.addEventListener('click', function() {
+            //             const ssid = this.querySelector('.ssid').textContent;
+            //             const requiresPassword = true; // You should determine this based on network security
+            //             showPasswordPrompt(ssid, requiresPassword);
+            //         });
+            //     }
+            // });
+
+            document.querySelectorAll('.wifi-signal').forEach(function(element) {
+                const signal = parseInt(element.dataset.signal);
+                const strength = getSignalStrength(signal);
+                element.classList='wifi-signal strength-' + strength;
+            });
+
+            clickOutSideOfPopup('password-popup');
+            clickOutSideOfPopup('create-network-popup');
+            clickOutSideOfPopup('connect-network-popup');
+            clickOutSideOfPopup('delete-network-popup');
 
             // Handle Enter key in password input
             const passwordInput = document.getElementById('wifi-password');
@@ -190,9 +372,48 @@
                 });
             }
 
+            // Handle Enter key in password input
+            const cn_passwordInput = document.getElementById('create-network-popup');
+            if (cn_passwordInput) {
+                cn_passwordInput.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') {
+                        createNetwork();
+                    }
+                });
+            }
         });
     </script>
     <style>
+        .network-controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .autoconnect-label {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 0.9em;
+            color: #666;
+            cursor: pointer;
+        }
+        
+        .autoconnect-checkbox {
+            margin: 0;
+            cursor: pointer;
+        }
+
+        .header-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .header-buttons {
+            display: flex;
+            gap: 10px;
+        }
         :root {
             --color-bg: #ffffff;
             --color-border: #d0d7de;
@@ -223,9 +444,7 @@
             font-size: 24px;
             font-weight: 600;
             color: var(--color-header);
-            margin-bottom: 16px;
-            padding-bottom: 16px;
-            border-bottom: 1px solid var(--color-border);
+            margin-bottom: 8px;
         }
 
         .wifi-list {
@@ -352,6 +571,8 @@
             color: #ffffff;
         }
 
+
+        
         .refresh-button {
             display: inline-block;
             padding: 5px 16px;
@@ -437,6 +658,32 @@
         }
 
 
+        .connect-button {
+            padding: 8px 16px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-left: 10px;
+        }
+
+        .connect-button:hover {
+            background-color: #45a049;
+        }
+
+        .delete-button {
+            background-color: #ff4444;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 8px 16px;
+            margin-left: 10px;
+            cursor: pointer;
+        }
+        .delete-button:hover {
+            background-color: #cc0000;
+        }
 
         @media screen and (max-width: 768px) {
         .container {
@@ -582,6 +829,30 @@
         background-color: #f0f0f0;
     }
 
+    .popup-buttons-danger {
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+        margin-top: 15px;
+    }
+
+    .popup-buttons-danger button {
+        padding: 8px 16px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+    }
+
+    .popup-buttons-danger button:first-child {
+        background-color: #ff4444;
+        color: white;
+    }
+
+    .popup-buttons-danger button:last-child {
+        background-color: #f0f0f0;
+    }
+
+
     /* Blur effect class */
     .blur {
         filter: blur(5px);
@@ -605,8 +876,19 @@
 <body>
     <div id="main-content">
         <div class="container">
-            <h1>Available WiFi Networks</h1>
-            
+            <div class="header-container">
+                <h1>Available WiFi Networks</h1>
+                <div class="header-buttons">
+                    <button class="refresh-button" onclick="location.reload()">Refresh</button>
+                    {% if actual_state < 2 %}
+                    <button class="refresh-button" onclick="switchAP()">Switch to AP ({{actual_state}})</button>
+                    {% else %}
+                    <button class="refresh-button" onclick="disableAP()">Disable AP ({{actual_state}})</button>
+                    {% endif %}
+                    <button class="refresh-button" onclick="showCreateConnectionPrompt()">Create connection</button>
+                </div>
+            </div>
+            <li class="network-separator"></li>
             {% if networks %}
                 <ul class="wifi-list">
                 {% for network in networks %}
@@ -660,7 +942,7 @@
 
                 {% for network in networks %}
                     {% if not network.in_use %}
-                    <li class="wifi-network">
+                    <li class="wifi-network" {% if not network.known %} onclick="showPasswordPrompt('{{ network.ssid }}', true)" {% endif %}>
                         <div class="network-main">
                             <div class="ssid-info">
                                 <div class="ssid">{{ network.ssid }}</div>
@@ -668,10 +950,6 @@
                             </div>
                             <div class="network-details">
                                 <div class="detail-group">
-                                    <div class="detail-item">
-                                        <span class="label">Mode:</span>
-                                        <span class="value">{{ network.mode }}</span>
-                                    </div>
                                     <div class="detail-item">
                                         <span class="label">Ch:</span>
                                         <span class="value">{{ network.chan }}</span>
@@ -687,7 +965,16 @@
                                         <span class="value">{{ network.security }}</span>
                                     </div>
                                     {% if network.known %}
-                                    <div class="status" title="Known network">Saved</div>
+                                    <div class="network-controls">
+                                        <label class="autoconnect-label">
+                                            <input type="checkbox" class="autoconnect-checkbox" 
+                                                   onclick="toggleAutoconnect(event, '{{ network.ssid }}')"
+                                                   {% if network.autoconnect %}checked{% endif %}> 
+                                            Auto-connect
+                                        </label>
+                                        <button class="connect-button" onclick="connectNetwork('{{ network.ssid }}')" title="Connect to this network">Connect</button>
+                                        <button class="delete-button" onclick="deleteNetwork('{{ network.ssid }}')" title="Delete this network">Delete</button>
+                                    </div>
                                     {% endif %}
                                 </div>
                             </div>
@@ -710,12 +997,22 @@
                     <div class="known-networks-section">
                         <h2>Saved Networks (Not in Range)</h2>
                         <ul class="wifi-list unreachable-networks">
-                            {% for network_name in unreacheable_known %}
+                            {% for ukn in unreacheable_known %}
                             <li class="wifi-network unreachable-network">
                                 <div class="network-main">
                                     <div class="ssid-info">
-                                        <div class="ssid">{{ network_name }}</div>
+                                        <div class="ssid">{{ ukn.ssid }}</div>
                                     </div>
+                                </div>
+                                <div class="network-controls">
+                                    <label class="autoconnect-label">
+                                        <input type="checkbox" class="autoconnect-checkbox" 
+                                               onclick="toggleAutoconnect(event, '{{ ukn.ssid }}')"
+                                               {% if ukn.autoconnect %}checked{% endif %}> 
+                                        Auto-connect
+                                    </label>
+                                    <button class="connect-button" onclick="connectNetwork('{{ ukn.ssid }}')" title="Connect to this network">Connect</button>
+                                    <button class="delete-button" onclick="deleteNetwork('{{  ukn.ssid }}')" title="Delete this network">Delete</button>
                                 </div>
                             </li>
                             {% endfor %}
@@ -729,17 +1026,7 @@
                     <p>No WiFi networks found.</p>
                 </div>
             {% endif %}
-            <button class="refresh-button" onclick="location.reload()">
-                ↻ Refresh Networks
-            </button>
-
-            {% if actual_state < 2 %}
-                <button class="refresh-button" onclick="switchAP()">Switch to AP ({{actual_state}})</button>
-            {% endif %}
-
-            {% if actual_state == 2 %}
-                <button class="refresh-button" onclick="disableAP()">Disable AP ({{actual_state}})</button>
-            {% endif %}
+            
         </div>
     </div>
 
@@ -761,6 +1048,42 @@
         </div>
     </div>
 
+    <div id="create-network-popup" class="popup">
+        <div class="popup-content">
+            <h2>Create new connection</h2>
+            <input type="text" id="cn-wifi-ssid" placeholder="SSID">
+            <input type="password" id="cn-wifi-password" placeholder="Enter password">
+            <div class="popup-buttons">
+                <button onclick="createNetwork()" id="cn_createBtn">Create</button>
+                <button onclick="closePopup()">Cancel</button>
+            </div>
+            <div id="cn-status-message"></div>
+        </div>
+    </div>
+
+    <div id="connect-network-popup" class="popup">
+        <div class="popup-content">
+            <h2>Confirm Network Connection</h2>
+            <p>Are you sure you want to connect the network: <span id="connect-network-name"></span>?</p>
+            <div class="popup-buttons">
+                <button onclick="confirmConnect()" id="connectBtn">Connect</button>
+                <button onclick="closePopup()">Cancel</button>
+            </div>
+            <div id="cnx-status-message"></div>
+        </div>
+    </div>
+
+    <div id="delete-network-popup" class="popup">
+        <div class="popup-content">
+            <h2>Confirm Network Deletion</h2>
+            <p>Are you sure you want to delete the network: <span id="delete-network-name"></span>?</p>
+            <div class="popup-buttons-danger">
+                <button onclick="confirmDelete()" id="deleteBtn">Delete</button>
+                <button onclick="closePopup()">Cancel</button>
+            </div>
+            <div id="del-status-message"></div>
+        </div>
+    </div>
 </body>
 </html>
  

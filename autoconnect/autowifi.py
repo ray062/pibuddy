@@ -82,8 +82,8 @@ class WifiManager:
 
         # Scan for available networks
         try:
-            subprocess.run(['nmcli', 'con', 'down', 'Hotspot'], check=False)
-            subprocess.run(['nmcli', 'device', 'wifi', 'rescan'], check=True)
+            subprocess.run(['nmcli', 'con', 'down', self.HOTSPOT_CONNAME], check=False)
+            subprocess.run(['nmcli', 'device', 'wifi', 'rescan'], check=False)
         except subprocess.CalledProcessError:
             logger.warning("Failed to rescan WiFi networks")
 
@@ -109,8 +109,8 @@ class WifiManager:
     def start_ap_mode(self) -> bool:
         try:
             # Disable and delete the AP whatever it exists or not
-            subprocess.run(['nmcli', 'con', 'down', 'Hotspot'], check=False)
-            subprocess.run(['nmcli', 'con', 'delete', 'Hotspot'], check=False)
+            subprocess.run(['nmcli', 'con', 'down', self.HOTSPOT_CONNAME], check=False)
+            subprocess.run(['nmcli', 'con', 'delete', self.HOTSPOT_CONNAME], check=False)
             # Stop any existing connection
             subprocess.run(['nmcli', 'device', 'disconnect', 'wlan0'], check=False)
             
@@ -119,7 +119,7 @@ class WifiManager:
                 'nmcli', 'connection', 'add',
                 'type', 'wifi',
                 'ifname', 'wlan0',
-                'con-name', 'Hotspot',
+                'con-name', self.HOTSPOT_CONNAME,
                 'autoconnect', 'yes',
                 'ssid', self.ap_ssid,
                 '802-11-wireless.mode', 'ap',
@@ -129,12 +129,12 @@ class WifiManager:
             
             # Configure IP address for AP
             subprocess.run([
-                'nmcli', 'connection', 'modify', 'Hotspot',
+                'nmcli', 'connection', 'modify', self.HOTSPOT_CONNAME,
                 'ipv4.method', 'shared'
             ], check=True)
             
             # Activate the hotspot
-            subprocess.run(['nmcli', 'connection', 'up', 'Hotspot'], check=True)
+            subprocess.run(['nmcli', 'connection', 'up', self.HOTSPOT_CONNAME], check=True)
             logger.info("Successfully started AP mode")
             self.ap_activated = True
             return True
@@ -145,8 +145,8 @@ class WifiManager:
 
     def manage_connection(self):
         # Disconnect from the Hotspot at the beginning, whatever the status it is.
-        subprocess.run(['nmcli', 'con', 'down', 'Hotspot'], check=False)
-        subprocess.run(['nmcli', 'con', 'delete', 'Hotspot'], check=False)
+        subprocess.run(['nmcli', 'con', 'down', self.HOTSPOT_CONNAME], check=False)
+        subprocess.run(['nmcli', 'con', 'delete', self.HOTSPOT_CONNAME], check=False)
         while True:
             if not self.is_connected_to_wifi():
                 logger.info("Not connected to WiFi, trying to connect...")
