@@ -386,7 +386,7 @@
     <style>
         .network-controls {
             display: flex;
-            align-items: center;
+            align-items: right;
             gap: 10px;
         }
         
@@ -881,9 +881,9 @@
                 <div class="header-buttons">
                     <button class="refresh-button" onclick="location.reload()">Refresh</button>
                     {% if actual_state < 2 %}
-                    <button class="refresh-button" onclick="switchAP()">Switch to AP ({{actual_state}})</button>
+                    <button class="refresh-button" onclick="switchAP()">Switch to AP</button>
                     {% else %}
-                    <button class="refresh-button" onclick="disableAP()">Disable AP ({{actual_state}})</button>
+                    <button class="refresh-button" onclick="disableAP()">Disable AP</button>
                     {% endif %}
                     <button class="refresh-button" onclick="showCreateConnectionPrompt()">Create connection</button>
                 </div>
@@ -901,16 +901,6 @@
                                 <div class="ip-address">{{ ip_address }}</div>
                             </div>
                             <div class="network-details">
-                                <div class="detail-group">
-                                    <div class="detail-item">
-                                        <span class="label">Mode:</span>
-                                        <span class="value">{{ network.mode }}</span>
-                                    </div>
-                                    <div class="detail-item">
-                                        <span class="label">Ch:</span>
-                                        <span class="value">{{ network.chan }}</span>
-                                    </div>
-                                </div>
                                 <div class="detail-group">
                                     <div class="detail-item">
                                         <span class="label">Rate:</span>
@@ -951,12 +941,6 @@
                             <div class="network-details">
                                 <div class="detail-group">
                                     <div class="detail-item">
-                                        <span class="label">Ch:</span>
-                                        <span class="value">{{ network.chan }}</span>
-                                    </div>
-                                </div>
-                                <div class="detail-group">
-                                    <div class="detail-item">
                                         <span class="label">Rate:</span>
                                         <span class="value">{{ network.rate }} {{ network.rate_unit }}</span>
                                     </div>
@@ -964,21 +948,21 @@
                                         <span class="label">Security:</span>
                                         <span class="value">{{ network.security }}</span>
                                     </div>
-                                    {% if network.known %}
-                                    <div class="network-controls">
-                                        <label class="autoconnect-label">
-                                            <input type="checkbox" class="autoconnect-checkbox" 
-                                                   onclick="toggleAutoconnect(event, '{{ network.ssid }}')"
-                                                   {% if network.autoconnect %}checked{% endif %}> 
-                                            Auto-connect
-                                        </label>
-                                        <button class="connect-button" onclick="connectNetwork('{{ network.ssid }}')" title="Connect to this network">Connect</button>
-                                        <button class="delete-button" onclick="deleteNetwork('{{ network.ssid }}')" title="Delete this network">Delete</button>
-                                    </div>
-                                    {% endif %}
                                 </div>
                             </div>
                         </div>
+                        {% if network.known %}
+                        <div class="network-controls">
+                            <label class="autoconnect-label">
+                                <input type="checkbox" class="autoconnect-checkbox" 
+                                        onclick="toggleAutoconnect(event, '{{ network.ssid }}')"
+                                        {% if network.autoconnect %}checked{% endif %}> 
+                                Auto-connect
+                            </label>
+                            <button class="connect-button" onclick="connectNetwork('{{ network.ssid }}')" title="Connect to this network">Connect</button>
+                            <button class="delete-button" onclick="deleteNetwork('{{ network.ssid }}')" title="Delete this network">Delete</button>
+                        </div>
+                        {% endif %}
                         <div class="signal-info">
                             <div class="wifi-signal" data-signal="{{ network.signal }}">
                                 <div class="bar bar-1"></div>
