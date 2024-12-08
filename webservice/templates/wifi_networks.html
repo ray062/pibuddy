@@ -16,6 +16,16 @@
             document.getElementById('main-content').classList.add('blur');
         }
 
+        function poweroff() {
+            document.getElementById('poweroff-popup').style.display = 'flex';
+            document.getElementById('main-content').classList.add('blur');
+        }
+
+        function switchAP() {
+            document.getElementById('switch-ap-popup').style.display = 'flex';
+            document.getElementById('main-content').classList.add('blur');
+        }
+
         function toggleAutoconnect(event, ssid) {
             event.stopPropagation();
             const enabled = event.target.checked;
@@ -60,13 +70,17 @@
             connectBtn.disabled = true;
             statusDiv.textContent = "Connecting... it would take some time. DO NOT refresh or close this page!"
             statusDiv.style.color = '';
+            let delay = document.getElementById('connect-delay').value;
             try {
                 const response = await fetch('/connect_network', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({ ssid: networkToConnect })
+                    body: JSON.stringify({ 
+                        ssid: networkToConnect,
+                        delay: delay,
+                    })
                 });
                 const data = await response.json();
                 if (data.result === 'OK') {
@@ -92,7 +106,9 @@
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({ ssid: networkToDelete })
+                    body: JSON.stringify({ 
+                        ssid: networkToDelete
+                     })
                 });
                 
                 if (response.ok) {
@@ -106,6 +122,41 @@
                 alert('Error deleting network: ' + error);
             }
             closePopup();
+        }
+
+        async function confirmPoweroff() {
+            let statusDiv = document.getElementById('po-status-message');
+            let poweroffBtn = document.getElementById('poweroffBtn');
+            poweroffBtn.disabled = true;
+            statusDiv.textContent = "Shutting down..."
+            statusDiv.style.color = '';
+            let delay = document.getElementById('poweroff-delay').value;
+            try {
+                const response = await fetch('/poweroff', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ 
+                        delay: delay
+                    })
+                });
+                const data = await response.json();
+                if (data.result === 'OK') {
+                    alert("Poweroff acknowledged by the Pibuddy!")
+                    statusDiv.textContent = "Poweroff acknowledged by the Pibuddy! You can close this window."
+                } else {
+                    poweroff();
+                    statusDiv.textContent = data.error;
+                    statusDiv.style.color = 'red';
+                    poweroffBtn.disabled = false;
+                }
+            } catch (error) {
+                poweroff();
+                statusDiv.textContent = 'error';
+                statusDiv.style.color = 'red';
+                poweroffBtn.disabled = false;
+            }
         }
 
         function getSignalStrength(signalPercentage) {
@@ -245,13 +296,20 @@
             document.getElementById('delete-network-popup').style.display = 'none';
             document.getElementById('connect-network-popup').style.display = 'none';
             document.getElementById('create-network-popup').style.display = 'none';
+            document.getElementById('poweroff-popup').style.display = 'none';
+            document.getElementById('switch-ap-popup').style.display = 'none';
 
             document.getElementById('cnx-status-message').textContent = '';
             document.getElementById('cnx-status-message').style.color = '';
         }
 
 
-        function switchAP() {
+        function confirmEnableAP() {
+            let statusDiv = document.getElementById('sap-status-message');
+            let switchapBtn = document.getElementById('switchapBtn');
+            poweroffBtn.disabled = true;
+            statusDiv.textContent = "Enabling AP...Please observe the WIFI list."
+            statusDiv.style.color = '';
             fetch('/switch_ap', {
                 method: 'POST'
             })
@@ -268,16 +326,25 @@
                         location.reload();
                     }, 2000);
                 } else {
-                    alert('Failed to switch network');
+                    statusDiv.textContent = 'Failed to enable AP';
+                    statusDiv.style.color = 'red';
+                    poweroffBtn.disabled = false;
                 }
             })
             .catch(error => {
                 console.error('Error:', error);
-                alert('Failed to switch network. Please try again.');
+                statusDiv.textContent = 'Failed to switch network. Please try again.';
+                statusDiv.style.color = 'red';
+                poweroffBtn.disabled = false;
             });
         }
 
-        function disableAP() {
+        function confirmDisableAP() {
+            let statusDiv = document.getElementById('sap-status-message');
+            let switchapBtn = document.getElementById('switchapBtn');
+            poweroffBtn.disabled = true;
+            statusDiv.textContent = "Disabling AP...Please observe the WIFI list."
+            statusDiv.style.color = '';
             fetch('/disable_ap', {
                 method: 'POST'
             })
@@ -294,12 +361,16 @@
                         location.reload();
                     }, 2000);
                 } else {
-                    alert('Failed to switch network');
+                    statusDiv.textContent = 'Failed to disable AP';
+                    statusDiv.style.color = 'red';
+                    poweroffBtn.disabled = false;
                 }
             })
             .catch(error => {
                 console.error('Error:', error);
-                alert('Failed to switch network. Please try again.');
+                statusDiv.textContent = 'Failed to disable AP. Please try again.';
+                statusDiv.style.color = 'red';
+                poweroffBtn.disabled = false;
             });
         }
 
@@ -361,6 +432,8 @@
             clickOutSideOfPopup('create-network-popup');
             clickOutSideOfPopup('connect-network-popup');
             clickOutSideOfPopup('delete-network-popup');
+            clickOutSideOfPopup('poweroff-popup');
+            clickOutSideOfPopup('switch-ap-popup');
 
             // Handle Enter key in password input
             const passwordInput = document.getElementById('wifi-password');
@@ -424,6 +497,8 @@
             --color-button-hover: #1a7f37;
             --color-connected: #dafbe1;
             --color-connected-border: #4ac26b;
+            --color-redbtn: #cc0000;
+            --color-redbtn-hover: red;
         }
 
         body {
@@ -591,6 +666,24 @@
             background-color: var(--color-button-hover);
         }
 
+        .poweroff-button {
+            display: inline-block;
+            padding: 5px 16px;
+            font-size: 14px;
+            font-weight: 600;
+            line-height: 20px;
+            cursor: pointer;
+            border: 1px solid rgba(27, 31, 36, 0.15);
+            border-radius: 6px;
+            background-color: var(--color-redbtn);
+            color: #ffffff;
+            transition: .2s cubic-bezier(0.3, 0, 0.5, 1);
+        }
+
+        .poweroff-button:hover {
+            background-color: var(--color-redbtn-hover);
+        }
+
         .no-networks {
             background-color: var(--color-bg);
             border: 1px solid var(--color-border);
@@ -673,7 +766,7 @@
         }
 
         .delete-button {
-            background-color: #ff4444;
+            background-color: var(--color-redbtn);
             color: white;
             border: none;
             border-radius: 4px;
@@ -682,7 +775,20 @@
             cursor: pointer;
         }
         .delete-button:hover {
-            background-color: #cc0000;
+            background-color: var(--color-redbtn-hover);
+        }
+
+        .delay-input {
+            margin: 15px 0;
+            text-align: center;
+        }
+        
+        .delay-input input[type="number"] {
+            width: 80px;
+            padding: 5px;
+            margin-left: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
         }
 
         @media screen and (max-width: 768px) {
@@ -879,13 +985,16 @@
             <div class="header-container">
                 <h1>Available WiFi Networks</h1>
                 <div class="header-buttons">
-                    <button class="refresh-button" onclick="location.reload()">Refresh</button>
-                    {% if actual_state < 2 %}
-                    <button class="refresh-button" onclick="switchAP()">Switch to AP</button>
-                    {% else %}
-                    <button class="refresh-button" onclick="disableAP()">Disable AP</button>
-                    {% endif %}
-                    <button class="refresh-button" onclick="showCreateConnectionPrompt()">Create connection</button>
+                    <button class="refresh-button" onclick="location.reload()">&#x21bb;</button>
+                    <button class="refresh-button" onclick="switchAP()">
+                        {% if actual_state < 2 %}
+                            Enable 
+                        {% else %}
+                            Disable 
+                        {% endif %}
+                        AP
+                    </button>
+                    <button class="refresh-button" onclick="showCreateConnectionPrompt()">+</button>
                 </div>
             </div>
             <li class="network-separator"></li>
@@ -960,7 +1069,7 @@
                                 Auto-connect
                             </label>
                             <button class="connect-button" onclick="connectNetwork('{{ network.ssid }}')" title="Connect to this network">Connect</button>
-                            <button class="delete-button" onclick="deleteNetwork('{{ network.ssid }}')" title="Delete this network">Delete</button>
+                            <button class="delete-button" onclick="deleteNetwork('{{ network.ssid }}')" title="Delete this network">&#10006;</button>
                         </div>
                         {% endif %}
                         <div class="signal-info">
@@ -992,18 +1101,21 @@
                                     <label class="autoconnect-label">
                                         <input type="checkbox" class="autoconnect-checkbox" 
                                                onclick="toggleAutoconnect(event, '{{ ukn.ssid }}')"
-                                               {% if ukn.autoconnect %}checked{% endif %}> 
+                                               {% if ukn.autoconnect %}checked{% endif %}>
                                         Auto-connect
                                     </label>
                                     <button class="connect-button" onclick="connectNetwork('{{ ukn.ssid }}')" title="Connect to this network">Connect</button>
-                                    <button class="delete-button" onclick="deleteNetwork('{{  ukn.ssid }}')" title="Delete this network">Delete</button>
+                                    <button class="delete-button" onclick="deleteNetwork('{{  ukn.ssid }}')" title="Delete this network">&#10006;</button>
                                 </div>
                             </li>
                             {% endfor %}
                         </ul>
                     </div>
                 {% endif %}
-
+                    <li class="network-separator"></li>
+                    <div class="header-buttons">
+                        <button class="poweroff-button" onclick="poweroff()">Power Off</button>
+                    </div>
                 </ul>
             {% else %}
                 <div class="no-networks">
@@ -1049,6 +1161,10 @@
         <div class="popup-content">
             <h2>Confirm Network Connection</h2>
             <p>Are you sure you want to connect the network: <span id="connect-network-name"></span>?</p>
+            <div class="delay-input">
+                <label for="connect-delay">Delay connection by (seconds):</label>
+                <input type="number" id="connect-delay" min="0" value="0" max="30">
+            </div>
             <div class="popup-buttons">
                 <button onclick="confirmConnect()" id="connectBtn">Connect</button>
                 <button onclick="closePopup()">Cancel</button>
@@ -1066,6 +1182,37 @@
                 <button onclick="closePopup()">Cancel</button>
             </div>
             <div id="del-status-message"></div>
+        </div>
+    </div>
+
+    <div id="poweroff-popup" class="popup">
+        <div class="popup-content">
+            <h2>Confirm Poweroff</h2>
+            <p>Are you sure you want to Power off?</p>
+            <div class="delay-input">
+                <label for="poweroff-delay">Delay connection by (seconds):</label>
+                <input type="number" id="poweroff-delay" min="0" value="0" max="600">
+            </div>
+            <div class="popup-buttons-danger">
+                <button onclick="confirmPoweroff()" id="poweroffBtn">Power Off</button>
+                <button onclick="closePopup()">Cancel</button>
+            </div>
+            <div id="po-status-message"></div>
+        </div>
+    </div>
+
+    <div id="switch-ap-popup" class="popup">
+        <div class="popup-content">
+            <h2>Confirm to switch AP mode</h2>
+            <div class="popup-buttons-danger">
+                {% if actual_state < 2 %}
+                    <button onclick="confirmEnableAP()" id="switchapBtn">Enable AP</button>
+                {% else %}
+                    <button onclick="confirmDisableAP()" id="switchapBtn">Disable AP</button>
+                {% endif %}
+                <button onclick="closePopup()">Cancel</button>
+            </div>
+            <div id="sap-status-message"></div>
         </div>
     </div>
 </body>

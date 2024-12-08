@@ -101,6 +101,7 @@ class WifiManager:
                     except subprocess.CalledProcessError:
                         logger.warning(f"Failed to connect to {network}")
                         continue
+                subprocess.run(['nmcli', 'con', 'modify', network, 'autoconnect', 'yes'], check=False)
         except subprocess.CalledProcessError as e:
             logger.error(f"Failed to list WiFi networks: {e}")
         
@@ -147,6 +148,9 @@ class WifiManager:
         # Disconnect from the Hotspot at the beginning, whatever the status it is.
         subprocess.run(['nmcli', 'con', 'down', self.HOTSPOT_CONNAME], check=False)
         subprocess.run(['nmcli', 'con', 'delete', self.HOTSPOT_CONNAME], check=False)
+        subprocess.run(['nmcli', 'dev', 'wifi', 'rescan'], check=False)
+        time.sleep(5)
+        subprocess.run(['nmcli', 'dev', 'wifi', 'list'], check=False)
         while True:
             if not self.is_connected_to_wifi():
                 logger.info("Not connected to WiFi, trying to connect...")
@@ -155,7 +159,7 @@ class WifiManager:
                     self.start_ap_mode()
             else:
                 logger.info("Connected to WiFi, no action needed, quite the service.") 
-                break
+                return
             time.sleep(30)  # Check every 30 seconds
 
 

@@ -2,13 +2,14 @@ import os
 import socket
 import tempfile
 import json
+import time
 import subprocess
-from dataclasses import dataclass
 
 from flask import Flask, render_template, request, jsonify
 
 from network import netinfo
 from network import wifi_manager
+from syscmd import state
 import setting
 
 app = Flask(__name__)
@@ -209,6 +210,26 @@ def shutdown():
     shutdown_server()
     return 'Server shutting down...'
 
+@app.route('/poweroff', methods=['POST'])
+def poweroff():
+    try:
+        data = request.get_json()
+        if not data or 'delay' not in data:
+            return jsonify({
+                'result': 'ERROR',
+                'error': 'delay is required in JSON body'
+            }), 400
+        
+        delay = int(data.get('delay', 0))
+        time.sleep(delay)
+        state.poweroff(setting.SUDO_PSW)
+        return jsonify({'result': 'OK'})
+    except Exception as e:
+        return jsonify({
+            'result': 'ERROR',
+            'error': str(e)
+        }), 500
+
 @app.route('/delete_network', methods=['POST'])
 def delete_network():
     data = request.get_json()
@@ -233,6 +254,8 @@ def connect_network():
             }), 400
         
         ssid = data['ssid'].strip()
+        delay = int(data.get('delay', 0))
+        time.sleep(delay)
         
         # Get current connection before attempting to change
         current_connection = wifi_manager.get_current_connection(setting.SUDO_PSW)

@@ -1,7 +1,6 @@
 import sys
 import subprocess
 import logging
-import logging
 
 def setup_logging():
     """Configure logging settings."""
